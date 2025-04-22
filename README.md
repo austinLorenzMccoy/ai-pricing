@@ -3,14 +3,17 @@
 ![RWA AI Pricing](https://img.shields.io/badge/RWA-AI%20Pricing-blue)
 ![Python](https://img.shields.io/badge/Python-3.9+-green)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-teal)
+![Web3](https://img.shields.io/badge/Web3-6.15.0-purple)
 ![License](https://img.shields.io/badge/License-MIT-orange)
 
-A sophisticated AI-powered engine for dynamic pricing of tokenized real-world assets (RWAs). This system leverages large language models, market data, sentiment analysis, and economic indicators to generate accurate price signals for tokenized assets.
+A sophisticated AI-powered engine for dynamic pricing of tokenized real-world assets (RWAs). This system leverages large language models, blockchain data, market data, sentiment analysis, and economic indicators to generate accurate price signals for tokenized assets.
 
 ## ✨ Features
 
-- **AI-Powered Pricing**: Uses Groq's LLM models to analyze multiple data sources and generate price signals
-- **Multi-Source Analysis**: Combines auction data, sentiment analysis, and economic indicators
+- **AI-Powered Pricing**: Uses Groq's LLM models (Mixtral-8x7b) to analyze multiple data sources and generate price signals
+- **Blockchain Integration**: Connects to Ethereum via Infura to verify asset ownership and metadata
+- **Multi-Source Analysis**: Combines NFT data, auction data, sentiment analysis, and economic indicators
+- **Real API Integrations**: Connects to Alpha Vantage, FRED, NewsAPI, and OpenSea APIs
 - **Vector Knowledge Base**: Maintains an evolving knowledge base of market trends and asset information
 - **RESTful API**: Clean, well-documented API built with FastAPI
 - **Modular Architecture**: Organized, maintainable codebase with clear separation of concerns
@@ -28,6 +31,8 @@ ai_pricing/
 ├── data/           # Data access and storage
 ├── models/         # Data models and schemas
 ├── services/       # External service integrations
+│   ├── blockchain.py  # Blockchain integration with Web3
+│   └── data_sources.py # API integrations for market data
 ├── tests/          # Test suite
 └── utils/          # Utility functions and helpers
 ```
@@ -61,20 +66,26 @@ docker run -p 8000:8000 --env-file .env rwa-ai-pricing
 
 ## ⚙️ Configuration
 
-Create a `.env` file in the project root with the following variables:
+Create a `.env` file in the project root with the following variables (or use the provided `.env.template`):
 
 ```
+# API Keys
+ALPHA_VANTAGE_KEY=your_alpha_vantage_key
+FRED_API_KEY=your_fred_api_key
+INFURA_ENDPOINT=https://mainnet.infura.io/v3/your_infura_key
+OPENSEA_API_KEY=your_opensea_api_key
+NEWSAPI_KEY=your_newsapi_key
+GROQ_API_KEY=your_groq_key
+API_TOKEN=your_secure_token
+
+# App Config
+REFRESH_INTERVAL=300  # 5 minutes
+
 # API Configuration
-API_TOKEN=your_api_token
 PORT=8000
 HOST=0.0.0.0
 DEBUG=False
 ENVIRONMENT=development
-
-# AI Service Keys
-GROQ_API_KEY=your_groq_api_key
-ALPHA_VANTAGE_KEY=your_alpha_vantage_key
-FRED_API_KEY=your_fred_api_key
 ```
 
 ## 🚀 Usage
@@ -104,6 +115,96 @@ python main.py --example
 - `GET /api/assets/{asset_id}`: Get asset metadata
 - `GET /api/health`: Health check endpoint
 
+### FastAPI Use Cases
+
+#### 1. Asset Price Generation
+
+```python
+# Request
+POST /api/price
+
+{
+  "asset_id": "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d/1",
+  "metadata": {
+    "name": "Bored Ape #1",
+    "category": "nft",
+    "description": "Bored Ape Yacht Club NFT",
+    "initial_price": 100000.0
+  }
+}
+
+# Response
+{
+  "asset_id": "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d/1",
+  "price": 125000.0,
+  "confidence_score": 0.85,
+  "timestamp": "2025-04-22T16:50:00.000000",
+  "factors": {
+    "recent_market_data": 0.4,
+    "sentiment_analysis": 0.2,
+    "economic_indicators": 0.1,
+    "blockchain_data": 0.2,
+    "asset_intrinsic_value": 0.1
+  },
+  "explanation": "Price based on recent sales, market sentiment, and blockchain verification",
+  "trend": "up"
+}
+```
+
+#### 2. Data Source Update
+
+```python
+# Request
+POST /api/datasource/update
+
+{
+  "source_name": "auction_data",
+  "data": {
+    "recent_sales": [
+      {"item": "digital_art_new_piece", "price": 62000, "date": "2025-04-22"},
+      {"item": "digital_art_trending", "price": 78000, "date": "2025-04-21"}
+    ],
+    "average_price": 70000,
+    "price_trend": "+12.8%"
+  },
+  "timestamp": "2025-04-22T16:50:00.000000"
+}
+
+# Response
+{
+  "status": "success",
+  "timestamp": "2025-04-22T16:50:01.123456"
+}
+```
+
+#### 3. Blockchain Asset Verification
+
+```python
+# Request
+GET /api/assets/0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d/1
+
+# Response
+{
+  "asset_id": "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d/1",
+  "name": "Bored Ape #1",
+  "contract": {
+    "name": "BoredApeYachtClub",
+    "symbol": "BAYC",
+    "address": "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D"
+  },
+  "owner": "0x8e04e63f69b4be0fd27a659933c203df2d5e2df5",
+  "metadata": {
+    "image_url": "https://ipfs.io/ipfs/QmeSjSinHpPnmXmspMjwiXyN6zS4E9zccariGR3jxcaWtq/1",
+    "traits": [...],
+    "last_sale": {
+      "price": 100.5,
+      "timestamp": "2025-03-15T12:30:45.000000"
+    }
+  },
+  "verified": true
+}
+```
+
 ## 🧪 Testing
 
 ```bash
@@ -116,10 +217,11 @@ pytest --cov=ai_pricing
 
 ## 🔄 Workflow
 
-1. **Data Collection**: The system collects data from various sources including auction platforms, sentiment analysis, and economic indicators.
-2. **AI Analysis**: The Groq LLM analyzes the collected data to determine a fair market price.
-3. **Price Signal Generation**: A price signal is generated with confidence score and influencing factors.
-4. **Knowledge Base Update**: The system's knowledge base is continuously updated with new market data.
+1. **Data Collection**: The system collects data from various sources including OpenSea, Alpha Vantage, NewsAPI, FRED, and Ethereum blockchain.
+2. **Blockchain Verification**: Asset ownership and metadata are verified through Ethereum using Infura.
+3. **AI Analysis**: The Groq LLM (Mixtral-8x7b) analyzes the collected data to determine a fair market price.
+4. **Price Signal Generation**: A price signal is generated with confidence score and influencing factors.
+5. **Knowledge Base Update**: The system's knowledge base is continuously updated with new market data.
 
 ## 🔌 Integration
 
@@ -129,11 +231,16 @@ The RWA AI Pricing Engine can be integrated with:
 - **Trading Platforms**: Support dynamic pricing for secondary market trading
 - **DeFi Protocols**: Enable accurate collateral valuation for RWA-backed loans
 - **Oracle Networks**: Feed price data to on-chain applications
+- **NFT Marketplaces**: Provide accurate pricing for NFT assets
+- **Blockchain Applications**: Connect directly with smart contracts for on-chain pricing
 
 ## 🛣️ Roadmap
 
+- [x] Blockchain integration with Web3 and Infura
+- [x] Integration with real-world APIs (Alpha Vantage, FRED, NewsAPI, OpenSea)
+- [x] Upgraded LLM to Mixtral-8x7b for better analysis
+- [ ] Multi-chain support (Ethereum, Polygon, Solana)
 - [ ] Enhanced sentiment analysis with specialized models
-- [ ] Integration with more data sources
 - [ ] Advanced anomaly detection for price manipulation
 - [ ] Time-series forecasting for price trends
 - [ ] Governance mechanism for pricing disputes

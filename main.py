@@ -67,7 +67,7 @@ async def run_example():
             data=new_auction_data["data"],
             timestamp=new_auction_data["timestamp"]
         )
-        update_result = await pricing_engine.update_knowledge_base(data_source_update.dict())
+        update_result = await pricing_engine.update_knowledge_base(data_source_update.model_dump())
         print(f"Data source update result: {update_result}")
         
     except Exception as e:
