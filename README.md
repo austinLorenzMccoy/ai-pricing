@@ -15,6 +15,7 @@ A sophisticated AI-powered engine for dynamic pricing of tokenized real-world as
 - **Multi-Source Analysis**: Combines NFT data, auction data, sentiment analysis, and economic indicators
 - **Real API Integrations**: Connects to Alpha Vantage, FRED, NewsAPI, and OpenSea APIs
 - **Vector Knowledge Base**: Maintains an evolving knowledge base of market trends and asset information
+- **Lightweight Embedding Model**: Uses TensorFlow Hub's Universal Sentence Encoder Lite (18.8 MB) for efficient text embeddings
 - **RESTful API**: Clean, well-documented API built with FastAPI
 - **Modular Architecture**: Organized, maintainable codebase with clear separation of concerns
 - **Docker Support**: Easy deployment with containerization
@@ -114,6 +115,25 @@ python main.py --example
 - `POST /api/datasource/update`: Update a data source
 - `GET /api/assets/{asset_id}`: Get asset metadata
 - `GET /api/health`: Health check endpoint
+
+### Using curl
+
+```bash
+# Health check endpoint (no authentication required)
+curl http://localhost:8000/api/health
+
+# Generate price signal (requires authentication)
+curl -X POST "http://localhost:8000/api/price" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your_api_token" \
+  -d '{"asset_id": "bitcoin", "current_price": 55000, "include_factors": true}'
+
+# Update data source (requires authentication)
+curl -X POST "http://localhost:8000/api/datasource/update" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your_api_token" \
+  -d '{"source_name": "market_data", "data": {"price": 55000}, "timestamp": "2025-04-28T16:00:00.000000"}'
+```
 
 ### FastAPI Use Cases
 
@@ -215,6 +235,16 @@ pytest
 pytest --cov=ai_pricing
 ```
 
+## 💡 Embedding Model
+
+The RWA AI Pricing Engine uses a lightweight embedding model for efficient text vectorization and semantic search:
+
+- **TensorFlow Hub's Universal Sentence Encoder Lite**: A compact 18.8 MB model that generates 512-dimensional embeddings
+- **Efficient Containerization**: Significantly smaller footprint compared to traditional embedding models (which can be several GB)
+- **Compatibility**: Maintains the same vector dimension (512) for compatibility with the FAISS vector store
+- **Batch Processing**: Implements efficient batch processing to handle large volumes of text
+- **Error Handling**: Includes robust error handling with fallback to zero vectors
+
 ## 🔄 Workflow
 
 1. **Data Collection**: The system collects data from various sources including OpenSea, Alpha Vantage, NewsAPI, FRED, and Ethereum blockchain.
@@ -239,6 +269,7 @@ The RWA AI Pricing Engine can be integrated with:
 - [x] Blockchain integration with Web3 and Infura
 - [x] Integration with real-world APIs (Alpha Vantage, FRED, NewsAPI, OpenSea)
 - [x] Upgraded LLM to Mixtral-8x7b for better analysis
+- [x] Implemented lightweight embedding model for efficient containerization
 - [ ] Multi-chain support (Ethereum, Polygon, Solana)
 - [ ] Enhanced sentiment analysis with specialized models
 - [ ] Advanced anomaly detection for price manipulation

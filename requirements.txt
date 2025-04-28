@@ -2,10 +2,10 @@ fastapi==0.110.0
 uvicorn==0.27.0
 python-dotenv==1.0.0
 pydantic==2.6.1
-langchain>=0.1.13
-langchain-core==0.1.42
-langchain-groq>=0.1.5
-langchain-community==0.0.27
+langchain-core==0.1.45
+langchain>=0.2.0
+langchain-groq==0.1.5
+langchain-community>=0.0.35
 groq>=0.5.0
 faiss-cpu
 pandas==2.1.4
@@ -13,7 +13,8 @@ numpy==1.26.3
 requests==2.31.0
 aiohttp==3.9.1
 textblob==0.17.1
-sentence-transformers>=2.2.2
+tensorflow-cpu==2.12.0
+tensorflow-hub==0.14.0
 web3==6.15.0
 python-jose==3.3.0
 passlib==1.7.4

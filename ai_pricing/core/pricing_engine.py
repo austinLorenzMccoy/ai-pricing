@@ -9,12 +9,11 @@ from typing import Dict, List, Optional, Any
 
 import aiohttp
 import asyncio
-from langchain.memory import ConversationBufferMemory
-from langchain.prompts import PromptTemplate
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage, SystemMessage
+import groq
+import faiss
+import numpy as np
+
+from ai_pricing.core.embedding_model import LightEmbeddingModel
 
 from ai_pricing.models.schemas import PriceSignal, DataSourceUpdate
 from ai_pricing.services.blockchain import BlockchainHelper
@@ -26,31 +25,39 @@ class AIPricingEngine:
     """AI-powered pricing engine for tokenized real-world assets."""
     
     def __init__(self):
-        """Initialize the pricing engine with LLM, blockchain helper, and embeddings."""
+        """Initialize the pricing engine with Groq API, blockchain helper, and embeddings."""
         # Initialize blockchain helper
         self.blockchain = BlockchainHelper()
         
-        # Initialize LLM
+        # Initialize logger
+        self.logger = logging.getLogger(__name__)
+        
+        # Initialize Groq API client
         self.api_key = os.getenv("GROQ_API_KEY")
         if not self.api_key:
             raise ValueError("GROQ_API_KEY environment variable is not set")
         
-        # Initialize Groq LLM
+        # Initialize Groq client
         try:
-            # Use llama3-70b-8192 model which is currently supported
-            self.llm = ChatGroq(
-                model_name="llama3-70b-8192",
-                groq_api_key=self.api_key,
-                temperature=0.1
-            )
+            # Initialize with just the API key, no additional parameters
+            self.client = groq.Client(api_key=self.api_key)
+            self.model = "llama3-70b-8192"  # Use llama3-70b-8192 model which is currently supported
+            self.temperature = 0.1
+            self.logger.info("Successfully initialized Groq client")
         except Exception as e:
-            logger.error(f"Error initializing ChatGroq: {e}")
-            # Fallback to direct API calls if needed
-            self.llm = None
+            self.logger.error(f"Error initializing Groq client: {e}")
+            # Create a mock client for testing
+            self.logger.warning("Using mock Groq client for testing")
+            self.client = None
         
-        # Initialize embeddings and memory
-        self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        self.memory = ConversationBufferMemory(memory_key="chat_history")
+        # Initialize embeddings model
+        try:
+            self.embedding_model = LightEmbeddingModel("universal-sentence-encoder-lite")
+            self.vector_dimension = self.embedding_model.vector_dimension  # Update dimension to match the model
+        except Exception as e:
+            self.logger.error(f"Error initializing embedding model: {e}")
+            self.embedding_model = None
+        
         self.last_model_update = datetime.now()
         
         # Parse REFRESH_INTERVAL, handling possible comments in the value
@@ -61,7 +68,7 @@ class AIPricingEngine:
                 refresh_interval_str = refresh_interval_str.split('#')[0].strip()
             self.refresh_interval = int(refresh_interval_str)
         except (ValueError, TypeError):
-            logger.warning(f"Invalid REFRESH_INTERVAL value: {refresh_interval_str}, using default 300")
+            self.logger.warning(f"Invalid REFRESH_INTERVAL value: {refresh_interval_str}, using default 300")
             self.refresh_interval = 300
         
         self.pricing_template = """
@@ -95,31 +102,32 @@ class AIPricingEngine:
         JSON RESPONSE:
         """
         
-        self.pricing_prompt = PromptTemplate(
-            input_variables=["asset_info", "blockchain_data", "market_data", "sentiment_data", "economic_data"],
-            template=self.pricing_template
-        )
-        
-        # Initialize vector store
-        self.vector_store = None
+        # Initialize FAISS vector store
+        self.index = None
+        self.documents = []
+        # Vector dimension is set when initializing the embedding model
         self.init_vector_store()
     
     def init_vector_store(self):
         """Initialize the vector store for asset knowledge."""
         try:
             if os.path.exists("faiss_index"):
-                self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-                # Set allow_dangerous_deserialization to True since we trust our own files
-                self.vector_store = FAISS.load_local(
-                    "faiss_index", 
-                    self.embeddings, 
-                    allow_dangerous_deserialization=True
-                )
-                logger.info("Loaded existing vector store")
+                # Load the index
+                self.index = faiss.read_index("faiss_index/index.faiss")
+                # Load the documents
+                with open("faiss_index/documents.json", "r") as f:
+                    self.documents = json.load(f)
+                self.logger.info("Loaded existing vector store from faiss_index")
             else:
-                logger.info("No existing vector store found, will create on first data update")
+                self.logger.info("No existing vector store found, initializing empty store")
+                # Initialize an empty index
+                self.index = faiss.IndexFlatL2(self.vector_dimension)
+                self.documents = []
         except Exception as e:
-            logger.error(f"Error initializing vector store: {e}")
+            self.logger.error(f"Error initializing vector store: {e}")
+            # Initialize an empty index as fallback
+            self.index = faiss.IndexFlatL2(self.vector_dimension)
+            self.documents = []
     
     async def get_asset_price(self, asset_id: str, asset_metadata: Dict = None) -> PriceSignal:
         """Generate pricing signal for an asset using multiple data sources including blockchain."""
@@ -161,9 +169,6 @@ class AIPricingEngine:
                     "token_uri": token_uri
                 }
             
-            # Prepare messages for the LLM
-            system_message = SystemMessage(content="You are an AI pricing specialist for tokenized real-world assets.")
-            
             # Format the prompt with all data sources
             prompt_content = self.pricing_template.format(
                 asset_info=json.dumps(asset_metadata, indent=2),
@@ -173,44 +178,54 @@ class AIPricingEngine:
                 economic_data=json.dumps(economic_data, indent=2)
             )
             
-            user_message = HumanMessage(content=prompt_content)
-            
-            # Call the Groq LLM using langchain or direct API if fallback needed
-            if self.llm:
-                # Use langchain interface
-                result = await self.llm.ainvoke([system_message, user_message])
-                result_text = result.content
-            else:
-                # Direct API call as fallback
-                headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-                
-                payload = {
-                    "model": "llama3-70b-8192",  # Use supported model
-                    "messages": [
-                        {"role": "system", "content": "You are an AI pricing specialist for tokenized real-world assets."},
-                        {"role": "user", "content": prompt_content}
-                    ],
-                    "temperature": 0.1,
-                    "max_tokens": 1000
-                }
-                
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        headers=headers,
-                        json=payload
-                    ) as response:
-                        if response.status != 200:
-                            error_text = await response.text()
-                            logger.error(f"API Error: {response.status} {response.reason}")
-                            logger.error(f"Response content: {error_text}")
-                            raise Exception(f"API Error: {response.status} {response.reason}")
-                        
-                        result_json = await response.json()
-                        result_text = result_json["choices"][0]["message"]["content"]
+            # Call the Groq API directly
+            try:
+                # Use the Groq client if available
+                if self.client:
+                    chat_completion = await self.client.chat.completions.create(
+                        model=self.model,
+                        messages=[
+                            {"role": "system", "content": "You are an AI pricing specialist for tokenized real-world assets."},
+                            {"role": "user", "content": prompt_content}
+                        ],
+                        temperature=self.temperature,
+                        max_tokens=1000
+                    )
+                    result_text = chat_completion.choices[0].message.content
+                else:
+                    # Fallback to direct API call if client initialization failed
+                    headers = {
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
+                    }
+                    
+                    payload = {
+                        "model": "llama3-70b-8192",
+                        "messages": [
+                            {"role": "system", "content": "You are an AI pricing specialist for tokenized real-world assets."},
+                            {"role": "user", "content": prompt_content}
+                        ],
+                        "temperature": 0.1,
+                        "max_tokens": 1000
+                    }
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://api.groq.com/openai/v1/chat/completions",
+                            headers=headers,
+                            json=payload
+                        ) as response:
+                            if response.status != 200:
+                                error_text = await response.text()
+                                self.logger.error(f"API Error: {response.status} {response.reason}")
+                                self.logger.error(f"Response content: {error_text}")
+                                raise Exception(f"API Error: {response.status} {response.reason}")
+                            
+                            result_json = await response.json()
+                            result_text = result_json["choices"][0]["message"]["content"]
+            except Exception as e:
+                self.logger.error(f"Error calling Groq API: {e}")
+                raise
             
             try:
                 # Extract JSON from the response if it's wrapped in markdown code blocks
@@ -222,7 +237,7 @@ class AIPricingEngine:
                 else:
                     parsed_result = json.loads(result_text.strip())
             except json.JSONDecodeError:
-                logger.warning(f"Invalid JSON from LLM: {result_text}")
+                self.logger.warning(f"Invalid JSON from LLM: {result_text}")
                 parsed_result = {
                     "price": asset_metadata.get("initial_price", 10000),
                     "confidence_score": 0.5,
@@ -243,7 +258,7 @@ class AIPricingEngine:
             return signal
                 
         except Exception as e:
-            logger.error(f"Error generating price signal: {e}")
+            self.logger.error(f"Error generating price signal: {e}")
             return PriceSignal(
                 asset_id=asset_id,
                 price=asset_metadata.get("initial_price", 10000) if asset_metadata else 10000,
@@ -255,42 +270,70 @@ class AIPricingEngine:
     def log_pricing_decision(self, asset_id: str, signal: PriceSignal, full_result: Dict):
         """Log pricing decisions for audit and improvement."""
         try:
-            logger.info(f"Price signal for {asset_id}: {full_result}")
+            self.logger.info(f"Price signal for {asset_id}: {full_result}")
         except Exception as e:
-            logger.error(f"Error logging pricing decision: {e}")
-    
+            self.logger.error(f"Error logging pricing decision: {e}")
+
     async def update_knowledge_base(self, data: Dict) -> Dict:
         """Update the knowledge base with new data."""
         try:
-            source_name = data.get("source_name")
-            source_data = data.get("data")
-            timestamp = data.get("timestamp")
-            
-            if not source_name or not source_data:
-                return {"error": "Invalid data source update"}
+            source_name = data.get("source", "unknown")
+            timestamp = datetime.now().isoformat()
             
             # Convert data to text for embedding
-            data_text = f"Source: {source_name}\nTimestamp: {timestamp}\nData: {json.dumps(source_data)}"
+            if isinstance(data.get("content"), dict):
+                data_text = json.dumps(data["content"])
+            elif isinstance(data.get("content"), str):
+                data_text = data["content"]
+            else:
+                data_text = str(data)
+            
+            # Create document metadata
+            document = {
+                "text": data_text,
+                "metadata": {
+                    "source": source_name,
+                    "timestamp": timestamp
+                }
+            }
+            
+            # Generate embedding
+            embedding = self.embedding_model.encode([data_text])[0]
+            embedding = embedding.reshape(1, -1)  # Reshape for FAISS
             
             # Create or update vector store
-            if not self.vector_store:
-                texts = [data_text]
-                metadatas = [{"source": source_name, "timestamp": timestamp}]
-                self.vector_store = FAISS.from_texts(texts, self.embeddings, metadatas=metadatas)
-                self.vector_store.save_local("faiss_index")
-                logger.info("Created new vector store")
+            if not hasattr(self, 'index') or self.index is None:
+                # Create a new index
+                self.index = faiss.IndexFlatL2(self.vector_dimension)
+                self.documents = [document]
+                self.index.add(embedding)
+                
+                # Save the index and documents
+                os.makedirs("faiss_index", exist_ok=True)
+                faiss.write_index(self.index, "faiss_index/index.faiss")
+                with open("faiss_index/documents.json", "w") as f:
+                    json.dump(self.documents, f)
+                    
+                self.logger.info("Created new vector store")
             else:
-                self.vector_store.add_texts([data_text], [{"source": source_name, "timestamp": timestamp}])
-                self.vector_store.save_local("faiss_index")
-                logger.info(f"Updated vector store with new {source_name} data")
+                # Update existing index
+                self.documents.append(document)
+                self.index.add(embedding)
+                
+                # Save the updated index and documents
+                faiss.write_index(self.index, "faiss_index/index.faiss")
+                with open("faiss_index/documents.json", "w") as f:
+                    json.dump(self.documents, f)
+                    
+                self.logger.info(f"Updated vector store with new {source_name} data")
             
             return {
                 "status": "success",
-                "timestamp": datetime.now().isoformat()
+                "message": f"Updated knowledge base with {source_name} data"
             }
             
         except Exception as e:
-            logger.error(f"Error updating knowledge base: {e}")
+            self.logger.error(f"Error updating knowledge base: {e}")
             return {"error": str(e)}
 
 # Import for type hints
