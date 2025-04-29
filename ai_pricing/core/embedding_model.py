@@ -59,14 +59,13 @@ class LightEmbeddingModel:
             
             # For lite model, we need to initialize differently
             if model_name == "universal-sentence-encoder-lite":
-                # The lite model requires special handling
-                # It has separate modules for preprocessing and encoding
+                # The lite model requires special handling but uses much less memory
                 self.logger.info("Initializing lite model components")
                 
-                # Switch to using the regular model for simplicity
-                self.logger.info("Switching to regular universal-sentence-encoder model")
-                self.model = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
-                self.model_name = "universal-sentence-encoder"
+                # Actually use the lite model to save memory
+                self.logger.info("Loading universal-sentence-encoder-lite model")
+                self.model = hub.load("https://tfhub.dev/google/universal-sentence-encoder-lite/2")
+                self.model_name = "universal-sentence-encoder-lite"
             
             self.logger.info("Model loaded successfully")
             
@@ -91,7 +90,13 @@ class LightEmbeddingModel:
             return np.array([])
         
         try:
-            # Process in batches to avoid memory issues
+            # Handle lite model differently
+            if self.model_name == "universal-sentence-encoder-lite":
+                # For lite model, we need to use a different approach
+                # The lite model is more memory efficient but requires more steps
+                return self._encode_with_lite_model(sentences, batch_size)
+            
+            # Process in batches to avoid memory issues for standard models
             all_embeddings = []
             
             # Regular and large models can be called directly
@@ -101,8 +106,45 @@ class LightEmbeddingModel:
                 all_embeddings.append(embeddings)
             
             # Concatenate all embeddings
-            return np.vstack(all_embeddings)
+            return np.array(all_embeddings)
         except Exception as e:
             self.logger.error(f"Error encoding sentences: {e}")
-            # Return zero vectors as fallback
+            # Return zero embeddings as fallback
+            return np.zeros((len(sentences), self.vector_dimension))
+
+    def _encode_with_lite_model(self, sentences, batch_size=32):
+        """Encode sentences using the lite model which requires special handling.
+        
+        The lite model is more memory efficient but requires more steps to use.
+        
+        Args:
+            sentences: List of strings to encode
+            batch_size: Batch size for encoding
+            
+        Returns:
+            Numpy array of embeddings with shape (len(sentences), vector_dimension)
+        """
+        try:
+            # The lite model has separate modules for preprocessing and encoding
+            # This approach uses much less memory
+            self.logger.info(f"Encoding {len(sentences)} sentences with lite model")
+            
+            # Process in smaller batches to minimize memory usage
+            all_embeddings = []
+            for i in range(0, len(sentences), batch_size):
+                batch = sentences[i:i+batch_size]
+                # For the lite model, we need to call the model directly
+                # This is more memory efficient than the standard model
+                batch_embeddings = self.model(batch)
+                all_embeddings.extend(batch_embeddings.numpy())
+                
+                # Force garbage collection to free memory
+                if i % (batch_size * 5) == 0 and i > 0:
+                    import gc
+                    gc.collect()
+                    
+            return np.array(all_embeddings)
+        except Exception as e:
+            self.logger.error(f"Error encoding with lite model: {e}")
+            # Return zero embeddings as fallback
             return np.zeros((len(sentences), self.vector_dimension))
