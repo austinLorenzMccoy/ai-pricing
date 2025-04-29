@@ -64,7 +64,10 @@ venv.bak/
 # Project specific
 faiss_index/
 logs/
-data/
+# Allow Python files in data directory but ignore actual data files
+data/*
+!data/*.py
+!data/__init__.py
 .DS_Store
 
 # API keys and secrets
