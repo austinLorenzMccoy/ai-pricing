@@ -28,6 +28,20 @@ class LightEmbeddingModel:
         self.logger.info(f"Initializing LightEmbeddingModel with model: {model_name}")
         self.model_name = model_name
         
+        # Force using the lite model for deployment to reduce memory usage
+        if os.getenv("ENVIRONMENT") == "production":
+            self.logger.info("Production environment detected, forcing use of lite model")
+            model_name = "universal-sentence-encoder-lite"
+            
+        # Set TensorFlow to grow GPU memory usage
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        if gpus:
+            try:
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+            except RuntimeError as e:
+                self.logger.warning(f"Error setting GPU memory growth: {e}")
+        
         try:
             # Map model names to TF Hub URLs
             model_urls = {

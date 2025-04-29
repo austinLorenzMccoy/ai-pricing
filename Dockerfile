@@ -61,7 +61,8 @@ RUN mkdir -p /app/data /app/models /app/logs && \
 # Switch to non-root user
 USER appuser
 
-# Expose API port
+# Set and expose API port
+ENV PORT=8000
 EXPOSE 8000
 
 # Health check
@@ -69,4 +70,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/api/health || exit 1
 
 # Command to run the API server
-CMD ["uvicorn", "ai_pricing.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD uvicorn ai_pricing.api.app:app --host 0.0.0.0 --port $PORT
