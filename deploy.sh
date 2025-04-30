@@ -25,10 +25,7 @@ if ! command_exists docker; then
   exit 1
 fi
 
-if ! command_exists docker-compose; then
-  echo -e "${RED}Error: docker-compose is not installed${NC}"
-  exit 1
-fi
+# No longer need docker-compose for deployment
 
 # Check if .env file exists
 if [ ! -f .env ]; then
@@ -61,22 +58,38 @@ fi
 # Docker operations
 echo -e "${YELLOW}Starting Docker deployment...${NC}"
 
-# Stop any running containers
-echo -e "${YELLOW}Stopping existing containers...${NC}"
-docker-compose -f docker-compose.production.yml down
+# Set container name
+CONTAINER_NAME="ai-pricing-api"
 
-# Build and start containers
-echo -e "${YELLOW}Building and starting containers...${NC}"
-docker-compose -f docker-compose.production.yml up --build -d
+# Stop and remove any existing container
+echo -e "${YELLOW}Stopping existing container if running...${NC}"
+docker stop $CONTAINER_NAME 2>/dev/null || true
+docker rm $CONTAINER_NAME 2>/dev/null || true
+
+# Build the Docker image
+echo -e "${YELLOW}Building Docker image...${NC}"
+docker build -t ai-pricing:latest -f Dockerfile.deployment .
+
+# Run the container
+echo -e "${YELLOW}Starting container...${NC}"
+docker run -d \
+  --name $CONTAINER_NAME \
+  --restart unless-stopped \
+  -p 9000:8000 \
+  --env-file .env \
+  -v "$(pwd)/data:/app/data" \
+  -v "$(pwd)/logs:/app/logs" \
+  -v "$(pwd)/faiss_index:/app/faiss_index" \
+  ai-pricing:latest
 
 # Check container status
 echo -e "${YELLOW}Checking container status...${NC}"
-docker ps | grep ai-pricing
+docker ps | grep $CONTAINER_NAME
 
 # Check logs
 echo -e "${YELLOW}Container logs (last 10 lines):${NC}"
-docker logs ai-pricing-api --tail 10
+docker logs $CONTAINER_NAME --tail 10
 
 echo -e "${GREEN}Deployment completed!${NC}"
-echo -e "${YELLOW}API is available at: http://localhost:8000${NC}"
-echo -e "${YELLOW}Health check: http://localhost:8000/api/health${NC}"
+echo -e "${YELLOW}API is available at: http://localhost:9000${NC}"
+echo -e "${YELLOW}Health check: http://localhost:9000/api/health${NC}"
