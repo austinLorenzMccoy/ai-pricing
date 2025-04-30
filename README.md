@@ -65,6 +65,29 @@ docker build -t rwa-ai-pricing .
 docker run -p 8000:8000 --env-file .env rwa-ai-pricing
 ```
 
+### Production Deployment with Docker Compose
+
+For production deployment, we provide optimized Docker configurations that handle dependency conflicts and ensure robust operation:
+
+```bash
+# Build and start the production services
+docker-compose -f docker-compose.production.yml up -d
+
+# Check logs
+docker logs ai-pricing-api
+
+# Stop the services
+docker-compose -f docker-compose.production.yml down
+```
+
+The production setup includes:
+
+- Patched embedding model that works without TensorFlow dependencies
+- Robust error handling for API integrations
+- Health checks to ensure service availability
+- Automatic asset database initialization
+- Proper network isolation for security
+
 ## ⚙️ Configuration
 
 Create a `.env` file in the project root with the following variables (or use the provided `.env.template`):

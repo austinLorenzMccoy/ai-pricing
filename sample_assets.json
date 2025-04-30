@@ -1,0 +1,83 @@
+{
+  "bored_ape_1234": {
+    "id": "bored_ape_1234",
+    "category": "nft",
+    "collection": "bored_ape_yacht_club",
+    "initial_price": 120000,
+    "current_price": 125000,
+    "metadata": {
+      "description": "Bored Ape #1234 from the Bored Ape Yacht Club collection",
+      "traits": {
+        "background": "blue",
+        "fur": "golden brown",
+        "clothes": "sailor shirt",
+        "eyes": "bored",
+        "hat": "captain's hat"
+      },
+      "rarity_score": 89.5,
+      "created_at": "2021-04-30T00:00:00Z"
+    },
+    "contract_address": "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D",
+    "token_id": "1234"
+  },
+  "manhattan_property_token": {
+    "id": "manhattan_property_token",
+    "category": "real_estate",
+    "initial_price": 2500000,
+    "current_price": 2600000,
+    "metadata": {
+      "description": "Tokenized Manhattan luxury apartment, 2000 sq ft, 3 bedrooms",
+      "address": "123 Park Avenue, New York, NY",
+      "square_feet": 2000,
+      "bedrooms": 3,
+      "bathrooms": 2.5,
+      "year_built": 2015,
+      "amenities": ["doorman", "gym", "rooftop", "parking"]
+    },
+    "contract_address": "0xd61E1Ccf90c293Ec1B02ad398626A3348Ef13A8a",
+    "token_id": "1001"
+  },
+  "ethereum_nft_12345": {
+    "id": "ethereum_nft_12345",
+    "category": "nft",
+    "collection": "crypto_art_collection",
+    "initial_price": 85000,
+    "current_price": 92000,
+    "metadata": {
+      "description": "Digital artwork by renowned crypto artist",
+      "artist": "CryptoMaster",
+      "edition": "1 of 10",
+      "created_at": "2024-01-15T00:00:00Z"
+    },
+    "contract_address": "0xd61E1Ccf90c293Ec1B02ad398626A3348Ef13A8a",
+    "token_id": "12345"
+  },
+  "digital_art_1": {
+    "id": "digital_art_1",
+    "category": "art",
+    "initial_price": 50000,
+    "current_price": 52000,
+    "metadata": {
+      "description": "Abstract digital art piece by emerging artist",
+      "artist": "DigitalDreamer",
+      "edition": "1 of 5",
+      "created_at": "2024-03-10T00:00:00Z"
+    }
+  },
+  "luxury_watch_token": {
+    "id": "luxury_watch_token",
+    "category": "luxury_goods",
+    "initial_price": 35000,
+    "current_price": 38500,
+    "metadata": {
+      "description": "Tokenized limited edition luxury watch",
+      "brand": "Patek Philippe",
+      "model": "Nautilus",
+      "year": 2023,
+      "serial_number": "PP78901234",
+      "materials": ["white gold", "sapphire crystal"]
+    },
+    "contract_address": "0x97c82cdCAfcd36362C0C2CE77cC59B5519653deD",
+    "token_id": "5001"
+  }
+}

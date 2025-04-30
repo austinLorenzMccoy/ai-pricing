@@ -1,0 +1,20 @@
+fastapi==0.110.0
+uvicorn==0.27.0
+python-dotenv==1.0.0
+pydantic==2.6.1
+# Core dependencies without version conflicts
+requests==2.31.0
+aiohttp==3.9.1
+numpy==1.23.5
+pandas<2.0.0
+faiss-cpu
+groq>=0.4.1
+# Web3 for blockchain integration
+web3==6.15.0
+# For API authentication
+python-jose==3.3.0
+passlib==1.7.4
+python-multipart==0.0.6
+python-dateutil==2.9.0
+# NLP tools
+textblob==0.17.1
